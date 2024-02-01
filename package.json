@@ -17,7 +17,8 @@
     "format": "npx prettier . --write",
     "test": "tsx ./quartz/util/path.test.ts",
     "profile": "0x -D prof ./quartz/bootstrap-cli.mjs build --concurrency=1",
-    "copy": "node scripts/copy-notes.js '/Users/siisee11/Library/Mobile Documents/iCloud~md~obsidian/Documents/iColudVault'"
+    "copy": "node scripts/copy-notes.js '/Users/siisee11/Library/Mobile Documents/iCloud~md~obsidian/Documents/iColudVault'",
+    "content": "npx quartz build --serve -d content"
   },
   "engines": {
     "npm": ">=9.3.1",
