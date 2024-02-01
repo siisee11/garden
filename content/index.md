@@ -1,7 +1,6 @@
 ---
 title: 디지가든 Digital Garden
 tags:
-  - blog
   - public
 ---
 
