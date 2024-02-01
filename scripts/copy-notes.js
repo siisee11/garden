@@ -3,6 +3,14 @@ import path from 'path';
 import matter from 'gray-matter';
 
 function copyFiles(srcDir, destDir) {
+    // Clear the destination directory
+    if (fs.existsSync(destDir)) {
+        fs.rmSync(destDir, { recursive: true });
+    }
+
+    // Create the destination directory
+    fs.mkdirSync(destDir, { recursive: true });
+
     // Read the source directory
     fs.readdir(srcDir, (err, files) => {
         if (err) {
@@ -26,8 +34,8 @@ function copyFiles(srcDir, destDir) {
                     const content = fs.readFileSync(srcFile, 'utf8');
                     const metadata = matter(content).data;
 
-                    // If it doesn't have the 'private' tag, copy it
-                    if (!metadata.tags || !metadata.tags.includes('private')) {
+                    // If it have the 'public' tag, copy it
+                    if (metadata.tags && metadata.tags.includes('public')) {
                         fs.copyFile(srcFile, destFile, (err) => {
                             if (err) {
                                 console.error(`Error copying file ${srcFile}.`, err);
