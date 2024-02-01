@@ -1,10 +1,9 @@
 ---
-title: 디지가든 Digital Garden
+title: "\bJtelkasten"
 tags:
   - public
 ---
-
-제이의 디지털 가든
+제이텔카스텐
 
 # Contents
 
