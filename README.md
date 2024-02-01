@@ -6,6 +6,12 @@ Replace path to match your environment
 node scripts/copy-notes.js '/Users/someone/Library/Mobile Documents/iCloud~md~obsidian/Documents/iColudVault'
 ```
 
+Or edit package.json 'copy' script and run
+
+```
+npm run copy
+```
+
 # Run on local
 
 ```
