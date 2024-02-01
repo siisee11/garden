@@ -1,3 +1,12 @@
+# Copy Obsidian notes
+
+Replace path to match your environment
+
+```
+node scripts/copy-notes.js '/Users/someone/Library/Mobile Documents/iCloud~md~obsidian/Documents/iColudVault'
+```
+
+
 # Quartz v4
 
 > “[One] who works with the door open gets all kinds of interruptions, but [they] also occasionally gets clues as to what the world is and what might be important.” — Richard Hamming
