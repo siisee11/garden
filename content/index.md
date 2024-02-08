@@ -7,7 +7,7 @@ tags:
 
 # Contents
 
-1. [[Permanent/Book|Book]]
+1. [[Permanent/book|book]]
 
 2. [[Permanent/CEO Interviews|CEO Interviews]]
 
