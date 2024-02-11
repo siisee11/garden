@@ -1771,6 +1771,808 @@ where
 
 ## [How to Write Tests](https://doc.rust-lang.org/book/ch11-01-writing-tests.html#how-to-write-tests)
 
+Rust의 test는 non-test 코드가 기대대로 동작하는지를 판별하는 function이다. test function의 body는 아래와 같은 3부분을 가진다.
+(뭐 대다수의 다른 테스트 프레임워크와 같다)
+
+1. 데이터나 초기 상태 셋업
+2. 코드 돌리기
+3. 기대한 값인지 확인하기
+
+### [The Anatomy of a Test Function](https://doc.rust-lang.org/book/ch11-01-writing-tests.html#the-anatomy-of-a-test-function)
+
+Rust의 테스트는 **`test` attribute가 annotated된 함수** 이다. 
+
+함수에 `#[test]` 어노테이션을 붙히면 test function이 된다.
+
+`cargo test` 커맨드로 어노테이션이 붙은 함수를 실행할 수 있다.
+
+프로젝트를 만들어보면서 더 자세히 알아보자.
+
+```bash
+$ cargo new adder --lib
+     Created library `adder` project
+$ cd adder
+$ cargo test
+```
+
+```rust
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+}
+```
+
+자세한 내용(assert 메크로 라든가, 사용법, should_panic 등..)은 특별할게 없으므로 생략
+
+## [Controlling How Tests Are Run](https://doc.rust-lang.org/book/ch11-02-running-tests.html#controlling-how-tests-are-run)
+
+기본적으로 `cargo test`는 모든 테스트 함수를 병렬적으로 실행함.
+
+command line argument로 test의 실행 방법을 조정할 수 있음.
+
+#### concurrency control (쓰레드 수 조정)
+
+```bash
+$ cargo test -- --test-threads=1
+```
+
+#### pass 된 테스트의 프린트도 출력
+
+```bash
+$ cargo test -- --show-output
+```
+
+#### Subset of test만 실행
+
+```rust
+pub fn add_two(a: i32) -> i32 {
+    a + 2
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_two_and_two() {
+        assert_eq!(4, add_two(2));
+    }
+
+    #[test]
+    fn add_three_and_two() {
+        assert_eq!(5, add_two(3));
+    }
+
+    #[test]
+    fn one_hundred() {
+        assert_eq!(102, add_two(100));
+    }
+}
+```
+
+* one_hunred 테스트만 진행
+```bash
+$ cargo test one_hundred
+```
+* add 가 포함된 테스트만 실행 (add_two_and_two, add_three_and_two)
+```
+$ cargo test add
+```
 
 
+## [Test Organization](https://doc.rust-lang.org/book/ch11-03-test-organization.html#test-organization)
+
+테스트를 구분하는 건 보통, unit test 와 integration test로 구분함.
+
+* Unit test
+	* 작고 더 집중적이며, 하나의 모듈을 독립적으로 테스트한다.
+	* private interface도 테스트 할 수 있음
+* Integration test
+	* 외부로 공개된 API를 위한 테스트
+	* 
+
+
+### [Unit Tests](https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests)
+
+유닛테스트는 코드의 한 부분을 다른 부분과 고립해서 테스트하는 것.
+Rust에서는 보통 테스트 하려는 파일에 unit test를 집어넣는다.
+컨벤션은 각 파일에 `tests`라는 모듈을 만들고 `cfg(test)`로 어노테이션하고 그안에 테스트 함수들을 적는것.
+
+`cfg(test)`가 붙은 모듈은 `cargo test`에서만 컴파일된다.
+
+예)
+```rust
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+}
+```
+
+#### [Testing Private Functions](https://doc.rust-lang.org/book/ch11-03-test-organization.html#testing-private-functions)
+
+private function을 테스트 해야하는 지는 커뮤니티에서 논쟁이 있다. 다른 언어에서는 private function을 테스트하기 어렵거나 불가능한데, Rust에서는 할 수 있다.
+
+```rust
+pub fn add_two(a: i32) -> i32 {
+    internal_adder(a, 2)
+}
+
+fn internal_adder(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn internal() {
+        assert_eq!(4, internal_adder(2, 2));
+    }
+}
+```
+
+Rust의 테스트코드는 뭐 제3의 테스트 라이브러리가 아니라 Rust의 function이다. 
+[“Paths for Referring to an Item in the Module Tree”](https://doc.rust-lang.org/book/ch07-03-paths-for-referring-to-an-item-in-the-module-tree.html) 에서 다룬 규칙이 그대로 적용되고, 따라서 자식은 조상의 items을 사용할 수 있으니 tests 모듈은 super의 함수를 사용할 수 있다.
+
+### [Integration Tests](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests)
+
+Rust에서 Integration tests는 우리의 Library 밖에 있는 것이다. 풀어쓰면, 외부에서 접근할 수 있는 부분을 테스트하는 것이다.
+이 테스트의 목적은 우리 라이브러리가 다른 외부 코드들과 잘 작동할 수 있는 지를 테스트하는 것이다.
+Integration tests를 위해서 test라는 폴더가 필요하다.
+
+#### [The _tests_ Directory](https://doc.rust-lang.org/book/ch11-03-test-organization.html#the-tests-directory)
+
+```
+adder
+├── Cargo.lock
+├── Cargo.toml
+├── src
+│   └── lib.rs
+└── tests
+    └── integration_test.rs
+```
+
+test/integration_test.rs 에 아래와 같은 테스트를 추가한다.
+```rust
+use adder;
+
+#[test]
+fn it_adds_two() {
+    assert_eq!(4, adder::add_two(2));
+}
+```
+
+특정 integration test만 수행하고 싶다면
+```bash
+cargo test --test integration_test
+```
+
+#### [Submodules in Integration Tests](https://doc.rust-lang.org/book/ch11-03-test-organization.html#submodules-in-integration-tests)
+
+Test의 setup 같은 공통된 로직을 정의하고 사용하기.
+
+#### [Integration Tests for Binary Crates](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests-for-binary-crates)
+
+Binary는 그 자체로 실행되어야하기 때문에 integration test 할 수 없다.
+그래서 보통 library를 하나 만들고 그걸 binary crate root에서 실행함으로써 integration test도 진행한다.
+
+# [An I/O Project: Building a Command Line Program](https://doc.rust-lang.org/book/ch12-00-an-io-project.html#an-io-project-building-a-command-line-program)
+
+드디어... CLI 만들기 
+
+grep 이라는 linux의 근본 프로그램을 만들어 볼 것 이다. Rust 커뮤니티 맴버 중 한명이 빠른 버전의 grep인 `ripgrep`을 만들었는데, 이 것 보다는 간단한 버전으로 만들것이다. 
+
+## [Accepting Command Line Arguments](https://doc.rust-lang.org/book/ch12-01-accepting-command-line-arguments.html#accepting-command-line-arguments)
+
+```bash
+$ cargo new minigrep 
+	Created binary (application) `minigrep` project 
+$ cd minigrep
+```
+
+일단 우리 프로그램이 2개의 argument를 받아서 실행하도록 할 것이다.
+```console
+$ cargo run -- searchstring example-filename.txt
+```
+
+### [Reading the Argument Values](https://doc.rust-lang.org/book/ch12-01-accepting-command-line-arguments.html#reading-the-argument-values)
+
+`std::env::args` 함수를 사용해서 argument 를 받을 것이다.
+
+```rust
+use std::env;
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    dbg!(args);
+}
+```
+
+* 실행해보면 argument가 출력된다.
+```console
+cargo run -- searchstring example-filename.txt
+    Finished dev [unoptimized + debuginfo] target(s) in 0.02s
+     Running `target/debug/minigrep searchstring example-filename.txt`
+[src/main.rs:5] args = [
+    "target/debug/minigrep",
+    "searchstring",
+    "example-filename.txt",
+]
+```
+
+### [Saving the Argument Values in Variables](https://doc.rust-lang.org/book/ch12-01-accepting-command-line-arguments.html#saving-the-argument-values-in-variables)
+
+```rust
+use std::env;
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let query = &args[1];
+    let file_path = &args[2];
+
+    println!("Searching for {}", query);
+    println!("In file {}", file_path);
+}
+```
+
+## [Reading a File](https://doc.rust-lang.org/book/ch12-02-reading-a-file.html#reading-a-file)
+
+일단 예시 파일을 준비하자. (프로젝트 루트/poem.txt)
+```
+I'm nobody! Who are you? Are you nobody, too? Then there's a pair of us - don't tell! They'd banish us, you know. How dreary to be somebody! How public, like a frog To tell your name the livelong day To an admiring bog!
+```
+
+파일을 읽는 부분을 추가한다.
+```rust
+use std::env;
+use std::fs;
+
+fn main() {
+    // --snip--
+    println!("In file {}", file_path);
+
+    let contents = fs::read_to_string(file_path)
+        .expect("Should have been able to read the file");
+
+    println!("With text:\n{contents}");
+}
+```
+
+> https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer VSCode라면 extension의 도움을 받자
+
+```console
+cargo run -- the poem.txt
+```
+
+
+## [Refactoring to Improve Modularity and Error Handling](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#refactoring-to-improve-modularity-and-error-handling)
+
+지금 상태에서 4가지 고칠 부분이 있다.
+1. main에서 두가지 역할을 수행한다. (argument parsing, read file)
+	1. 기능마다 함수를 분리해서 하나의 함수가 하나의 기능에 책임을 지게하는 것이 좋다.
+2. arguments(query, file_path)는 프로그램의 configurable variable이고 `contents`변수는 프로그램의 로직에 관여되어 있다. 목적에 따라 변수를 구조화해서 scope를 주고 각각의 목적을 더 명확하게 하면 좋다.
+3. `expect`에서 항상 같은 (거의 의미없는) 오류 메세지를 출력한다.
+	1. 에러가 발생할 이유가 너무 많은데도!
+4. 에러가 발생했을때 여기저기서 처리가 되어서, 에러 핸들링을 유지 관리하기 어렵다.
+	1. 에러 핸들링을 하는 코드를 한곳에 두자.
+
+### [Separation of Concerns for Binary Projects](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#separation-of-concerns-for-binary-projects)
+
+`main.rs`가 커지는 것을 막기 위해서 아래와 같은 가이드가 있다.
+
+- Split your program into a _main.rs_ and a _lib.rs_ and move your program’s logic to _lib.rs_.
+- As long as your command line parsing logic is small, it can remain in _main.rs_.
+- When the command line parsing logic starts getting complicated, extract it from _main.rs_ and move it to _lib.rs_.
+
+`main`의 책임을 아래와 같이 제한한다.
+
+- Calling the command line parsing logic with the argument values
+- Setting up any other configuration
+- Calling a `run` function in _lib.rs_
+- Handling the error if `run` returns an error
+
+#### [Extracting the Argument Parser](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#extracting-the-argument-parser)
+
+Parsing 하는 부분을 함수로 분리
+
+```rust
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let (query, file_path) = parse_config(&args);
+
+    // --snip--
+}
+
+fn parse_config(args: &[String]) -> (&str, &str) {
+    let query = &args[1];
+    let file_path = &args[2];
+
+    (query, file_path)
+}
+```
+
+#### [Grouping Configuration Values](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#grouping-configuration-values)
+
+Configuration value들은 같은 목적으로 사용되기 때문에 tuple로 쓰기 보다는 struct로 묶어 주자.
+
+```rust
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let config = parse_config(&args);
+
+    println!("Searching for {}", config.query);
+    println!("In file {}", config.file_path);
+
+    let contents = fs::read_to_string(config.file_path)
+        .expect("Should have been able to read the file");
+
+    // --snip--
+}
+
+struct Config {
+    query: String,
+    file_path: String,
+}
+
+fn parse_config(args: &[String]) -> Config {
+    let query = args[1].clone();
+    let file_path = args[2].clone();
+
+    Config { query, file_path }
+}
+```
+
+`parse_config` 에서 ownership 문제를 해결하기 위해서 `clone`을 사용했다. `clone`은 당연히 성능면에서 안좋지만, 한번밖에 안일어나기도 하고 데이터가 작기도하니 성능과 개발용이성 사이의 trade-off로 생각하면 된다.
+물론, 고수가 되면 더 효율적인 해결법으로 코딩할 수 있을 것이다.
+
+
+#### [Creating a Constructor for `Config`](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#creating-a-constructor-for-config)
+
+`parse_config`는 결국 Config를 만드는 것이므로 construct로 분리해주는 편이 좋다. String이 `String::new`로 인스턴스를 생성하는 것과 톤을 맞추는 것이다.
+
+```rust
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let config = Config::new(&args);
+
+    // --snip--
+}
+
+// --snip--
+
+impl Config {
+    fn new(args: &[String]) -> Config {
+        let query = args[1].clone();
+        let file_path = args[2].clone();
+
+        Config { query, file_path }
+    }
+}```
+
+### [Fixing the Error Handling](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#fixing-the-error-handling)
+
+argument의 수가 2가 아닐때 panic이 난다. panic의 기본 메세지(index out of...)은 개발자 친화적이지 유저가 봐야할 메세지는 아니다. 이를 처리하자.
+
+#### [Improving the Error Message](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#improving-the-error-message)
+
+```rust
+// --snip--
+fn new(args: &[String]) -> Config {
+	if args.len() < 3 {
+		panic!("not enough arguments");
+	}
+	// --snip--
+```
+
+사실 이렇게 한다고해도 에러메세지가 좀 더 좋아지긴 하지만, panic은 여전히 promgrammer 친화적이다.
+
+#### [Returning a `Result` Instead of Calling `panic!`](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#returning-a-result-instead-of-calling-panic)
+
+Panic 대신 Handling을 하기 위해 Result를 반환하도록 하자.
+
+```rust
+impl Config {
+    fn build(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() < 3 {
+            return Err("not enough arguments");
+        }
+
+        let query = args[1].clone();
+        let file_path = args[2].clone();
+
+        Ok(Config { query, file_path })
+    }
+}
+```
+
+#### [Calling `Config::build` and Handling Errors](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#calling-configbuild-and-handling-errors)
+
+```rust
+use std::process;
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let config = Config::build(&args).unwrap_or_else(|err| {
+        println!("Problem parsing arguments: {err}");
+        process::exit(1);
+    });
+
+    // --snip--
+
+```
+
+`unwrap_or_else`은 OK인 상황에서는 `unwrap`과 같이 OK의 값을 반환하고 Err인 경우에 err 를 처리하는 closure를 실행한다.  closure는 익명의 함수로 callback 함수와 유사하다. (나중에 자세히 다룬다)
+
+### [Extracting Logic from `main`](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#extracting-logic-from-main)
+
+마지막으로 이제 로직을 main에서 빼내자. 로직부분을 `run`함수로 추출하자.
+
+```rust
+fn main() {
+    // --snip--
+
+    println!("Searching for {}", config.query);
+    println!("In file {}", config.file_path);
+
+    run(config);
+}
+
+fn run(config: Config) {
+    let contents = fs::read_to_string(config.file_path)
+        .expect("Should have been able to read the file");
+
+    println!("With text:\n{contents}");
+}
+
+// --snip--
+
+```
+
+#### [Returning Errors from the `run` Function](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#returning-errors-from-the-run-function)
+
+run이 Result를 반환하게 하여 main에서 유저 친화적으로 에러를 핸들링할 수 있도록 하자.
+
+```rust
+use std::error::Error;
+
+// --snip--
+
+fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let contents = fs::read_to_string(config.file_path)?;
+
+    println!("With text:\n{contents}");
+
+    Ok(())
+}
+```
+
+#### [Handling Errors Returned from `run` in `main`](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#handling-errors-returned-from-run-in-main)
+
+반환된 결과(에러)를 메인에서 처리하자.
+
+```rust
+fn main() {
+    // --snip--
+
+    println!("Searching for {}", config.query);
+    println!("In file {}", config.file_path);
+
+    if let Err(e) = run(config) {
+        println!("Application error: {e}");
+        process::exit(1);
+    }
+}
+```
+
+### [Splitting Code into a Library Crate](https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html#splitting-code-into-a-library-crate)
+
+진짜 마지막으로 library로 코드를 분리하자.
+
+pub 키워드가 붙은것을 유의
+
+`src/lib.rs`
+
+```rust
+use std::error::Error;
+use std::fs;
+
+pub struct Config {
+    pub query: String,
+    pub file_path: String,
+}
+
+impl Config {
+    pub fn build(args: &[String]) -> Result<Config, &'static str> {
+        // --snip--
+    }
+}
+
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    // --snip--
+}
+```
+
+`src/main.rs`
+
+```rust
+use std::env;
+use std::process;
+
+use minigrep::Config;
+
+fn main() {
+    // --snip--
+    if let Err(e) = minigrep::run(config) {
+        // --snip--
+    }
+}
+```
+
+## [Developing the Library’s Functionality with Test-Driven Development](https://doc.rust-lang.org/book/ch12-04-testing-the-librarys-functionality.html#developing-the-librarys-functionality-with-test-driven-development)
+
+이제, 코드들을 열심히 분리했으니 test 코드를 짜기 수월해졌다.
+
+TDD 방식으로 minigrep의 searching logic을 구현해볼 것이다.
+
+1. 우리 의도에 맞게 실패하는 테스트 코드를 작성한다.
+2. 테스트를 통과하도록끔만 코드를 업데이트한다.
+3. 테스트가 통과하도록 유지하면서 리펙토링한다.
+4. 1번부터 다시한다.
+
+### [Writing a Failing Test](https://doc.rust-lang.org/book/ch12-04-testing-the-librarys-functionality.html#writing-a-failing-test)
+
+searcing에 대해서 실패하는 테스트 코드를 짜보자.
+
+`src/lib.rs`
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn one_result() {
+        let query = "duct";
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.";
+
+        assert_eq!(vec!["safe, fast, productive."], search(query, contents));
+    }
+}
+```
+
+컴파일이 되면서 테스트가 실패하도록 search 함수를 작성한다.
+반환값은 contents 레퍼런스와 관계가 있으니 lifetime annotation을 작성해준다.
+
+```rust
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> { 
+	vec![] 
+}
+```
+
+
+`cargo test`로 실패하는지 확인한다.
+
+### [Writing Code to Pass the Test](https://doc.rust-lang.org/book/ch12-04-testing-the-librarys-functionality.html#writing-code-to-pass-the-test)
+
+로직을 작성한다. (작성하면서 계속 테스트 돌리면서 작성한다)
+
+```rust
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    let mut results = Vec::new();
+
+    for line in contents.lines() {
+        if line.contains(query) {
+            results.push(line);
+        }
+    }
+
+    results
+}
+```
+
+test를 통과하는것을 확인하자
+
+#### [Using the `search` Function in the `run` Function](https://doc.rust-lang.org/book/ch12-04-testing-the-librarys-functionality.html#using-the-search-function-in-the-run-function)
+
+메인 로직에서 새로 만든 search 함수를 호출한다.
+
+```rust
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let contents = fs::read_to_string(config.file_path)?;
+
+    for line in search(&config.query, &contents) {
+        println!("{line}");
+    }
+
+    Ok(())
+}
+```
+
+이제 돌려보자
+```console
+cargo run -- frog poem.txt
+```
+
+## [Working with Environment Variables](https://doc.rust-lang.org/book/ch12-05-working-with-environment-variables.html#working-with-environment-variables)
+
+마지막으로 Environment variable을 활용하는 방법에 대해 알아보자.
+
+사용자가 Environment variable을 설정해서 case-insensitive search를 설정할 수 있도록 하자.
+
+### [Writing a Failing Test for the Case-Insensitive `search` Function](https://doc.rust-lang.org/book/ch12-05-working-with-environment-variables.html#writing-a-failing-test-for-the-case-insensitive-search-function)
+
+먼저 새로운 테스트를 추가한다.
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn case_sensitive() {
+        let query = "duct";
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.
+Duct tape.";
+
+        assert_eq!(vec!["safe, fast, productive."], search(query, contents));
+    }
+
+    #[test]
+    fn case_insensitive() {
+        let query = "rUsT";
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.
+Trust me.";
+
+        assert_eq!(
+            vec!["Rust:", "Trust me."],
+            search_case_insensitive(query, contents)
+        );
+    }
+}
+```
+
+원래 있던 테스트도 Case에 대한 예시를 추가했다.
+
+```rust
+pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> { 
+	vec![] 
+}
+```
+
+
+### [Implementing the `search_case_insensitive` Function](https://doc.rust-lang.org/book/ch12-05-working-with-environment-variables.html#implementing-the-search_case_insensitive-function)
+
+```rust
+pub fn search_case_insensitive<'a>(
+    query: &str,
+    contents: &'a str,
+) -> Vec<&'a str> {
+    let query = query.to_lowercase();
+    let mut results = Vec::new();
+
+    for line in contents.lines() {
+        if line.to_lowercase().contains(&query) {
+            results.push(line);
+        }
+    }
+
+    results
+}
+```
+
+Config에 따라 다른 함수를 호출
+
+```rust
+pub struct Config {
+    pub query: String,
+    pub file_path: String,
+    pub ignore_case: bool,
+}
+
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let contents = fs::read_to_string(config.file_path)?;
+
+    let results = if config.ignore_case {
+        search_case_insensitive(&config.query, &contents)
+    } else {
+        search(&config.query, &contents)
+    };
+
+    for line in results {
+        println!("{line}");
+    }
+
+    Ok(())
+}
+```
+
+ignore_case 는 환경변수에서 읽어온다.
+
+```rust
+use std::env;
+// --snip--
+
+impl Config {
+    pub fn build(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() < 3 {
+            return Err("not enough arguments");
+        }
+
+        let query = args[1].clone();
+        let file_path = args[2].clone();
+
+        let ignore_case = env::var("IGNORE_CASE").is_ok();
+
+        Ok(Config {
+            query,
+            file_path,
+            ignore_case,
+        })
+    }
+}
+```
+
+```console
+$ cargo run -- to poem.txt
+$ IGNORE_CASE=1 cargo run -- to poem.txt
+```
+
+## [Writing Error Messages to Standard Error Instead of Standard Output](https://doc.rust-lang.org/book/ch12-06-writing-to-stderr-instead-of-stdout.html#writing-error-messages-to-standard-error-instead-of-standard-output)
+
+진짜 진짜 마지막으로 Error 메세지를 Standard Error 로 내보내는 것을 하자. 터미널에는 보통 두개의 output 채널이 있다. _stdout, stderr_ 이다.
+이건 error 메세지를 무시한채로 output 메세지만 따로 저장하고자 함을 위함이다.
+
+### [Checking Where Errors Are Written](https://doc.rust-lang.org/book/ch12-06-writing-to-stderr-instead-of-stdout.html#checking-where-errors-are-written)
+
+```console
+cargo run > output.txt
+```
+
+우리 프로그램의 아웃풋을 파이프라이닝해서 file로 저장하면, error 메세지가 파일에 포함됨을 알 수 있다.
+(`>`는 stdout을 파이프라이닝 한다는 뜻이다.)
+
+### [Printing Errors to Standard Error](https://doc.rust-lang.org/book/ch12-06-writing-to-stderr-instead-of-stdout.html#printing-errors-to-standard-error)
+
+```rust
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let config = Config::build(&args).unwrap_or_else(|err| {
+        eprintln!("Problem parsing arguments: {err}");
+        process::exit(1);
+    });
+
+    if let Err(e) = minigrep::run(config) {
+        eprintln!("Application error: {e}");
+        process::exit(1);
+    }
+}
+```
+
+`eprintln`으로 stderr로 출력할 수 있다.
+
+# [Functional Language Features: Iterators and Closures](https://doc.rust-lang.org/book/ch13-00-functional-features.html#functional-language-features-iterators-and-closures)
 
