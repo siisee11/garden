@@ -2576,3 +2576,526 @@ fn main() {
 
 # [Functional Language Features: Iterators and Closures](https://doc.rust-lang.org/book/ch13-00-functional-features.html#functional-language-features-iterators-and-closures)
 
+Rust의 디자인은 선조 언어들과 기술들에 영향을 많이 받았다. 그 중 큰 영향을 받은건 함수형 프로그래밍이다.
+
+여기서 함수형 프로그래밍을 다루진 않고, 영향을 받은 Rust의 문법들을 살펴볼 것이다.
+
+## [Closures: Anonymous Functions that Capture Their Environment](https://doc.rust-lang.org/book/ch13-01-closures.html#closures-anonymous-functions-that-capture-their-environment)
+
+Closure는 익명(함수의 이름이 없는)함수이고 그 함수가 선언된 scope의 값들을 capture할 수(가지고 올 수) 있다.
+
+### [Capturing the Environment with Closures](https://doc.rust-lang.org/book/ch13-01-closures.html#capturing-the-environment-with-closures)
+
+Closure가 환경을 캡쳐한다는 게 당최 무슨 소리인지 예시를 통해 알아보자.
+
+어떤 회사가 티셔츠를 증정하는데, 선호하는 색을 입력하면 그 색의 옷을 주고, 아니면 가장 재고가 많은 색의 옷을 주는 프로그램이다.
+
+```rust
+#[derive(Debug, PartialEq, Copy, Clone)]
+enum ShirtColor {
+    Red,
+    Blue,
+}
+
+struct Inventory {
+    shirts: Vec<ShirtColor>,
+}
+
+impl Inventory {
+    fn giveaway(&self, user_preference: Option<ShirtColor>) -> ShirtColor {
+        user_preference.unwrap_or_else(|| self.most_stocked())
+    }
+
+    fn most_stocked(&self) -> ShirtColor {
+        let mut num_red = 0;
+        let mut num_blue = 0;
+
+        for color in &self.shirts {
+            match color {
+                ShirtColor::Red => num_red += 1,
+                ShirtColor::Blue => num_blue += 1,
+            }
+        }
+        if num_red > num_blue {
+            ShirtColor::Red
+        } else {
+            ShirtColor::Blue
+        }
+    }
+}
+
+fn main() {
+    let store = Inventory {
+        shirts: vec![ShirtColor::Blue, ShirtColor::Red, ShirtColor::Blue],
+    };
+
+    let user_pref1 = Some(ShirtColor::Red);
+    let giveaway1 = store.giveaway(user_pref1);
+    println!(
+        "The user with preference {:?} gets {:?}",
+        user_pref1, giveaway1
+    );
+
+    let user_pref2 = None;
+    let giveaway2 = store.giveaway(user_pref2);
+    println!(
+        "The user with preference {:?} gets {:?}",
+        user_pref2, giveaway2
+    );
+}
+```
+
+여기서 아래 부분에 집중하자.
+
+```rust
+user_preference.unwrap_or_else(|| self.most_stocked())
+```
+
+`unwrap_or_else`는 성공하면 value를 실패하면 넘겨준 closure를 실행시킨다.
+
+`||`는 closure의 parameter 부분이고 그 이후가 실행부이다. 
+( `| a, b | closure(a,b))` 이런 식으로 선언)
+
+`most_stocked`가 선언된 환경, `self Inventory` 인스턴스를 캡쳐해서 코드가 실행될 때 넘겨준다.
+
+(사실 예제가 잘 이해안됨. `method`라 self에 대한 reference를 받기 때문에 self를 사용할 수 있는거 아닌가?)
+
+#### 다른 예시
+
+closure의 다른 예시를 살펴보자.
+
+```rust
+fn main() {
+    let x = 4;
+
+    let equal_to_x = |z| z == x;
+
+    let y = 4;
+
+    assert!(equal_to_x(y));
+}
+```
+
+* 위의 equal_to_x 클로져는 x의 값을 캡쳐하기 때문에 클로져의 파라메터로 x를 넘겨주지 않아도 사용할 수 있다.
+* 함수로 정의하면 함수 내부 스코프에서는 x에 대해 모르므로 컴파일 에러난다.
+
+```rust
+fn main() {
+    let x = 4;
+
+    fn equal_to_x(z: i32) -> bool { z == x }
+
+    let y = 4;
+
+    assert!(equal_to_x(y));
+}
+```
+
+
+### [Closure Type Inference and Annotation](https://doc.rust-lang.org/book/ch13-01-closures.html#closure-type-inference-and-annotation)
+
+함수와 Closure는 더 많은 다른 점이 있다.
+
+* 클로져는 Type을 명시할 필요가 거의 없다. 클로져는 밖으로 공개되는 것이 아니라 유즈케이스로 부터 타입을 유추하면 되기 때문.
+	* 선언 방식이 자유롭다.
+```rust
+fn  add_one_v1   (x: u32) -> u32 { x + 1 }
+let add_one_v2 = |x: u32| -> u32 { x + 1 };
+let add_one_v3 = |x|             { x + 1 };
+let add_one_v4 = |x|               x + 1  ;
+```
+
+### [Capturing References or Moving Ownership](https://doc.rust-lang.org/book/ch13-01-closures.html#capturing-references-or-moving-ownership)
+
+Closure는 환경으로부터 세가지 방법으로 값을 캡쳐한다. (함수의 파라메터와 같은 방법)
+1. borrowing immutably
+2. borrowing mutably
+3. taking ownership
+
+* Immutable reference를 캡쳐
+
+```rust
+fn main() {
+    let list = vec![1, 2, 3];
+    println!("Before defining closure: {:?}", list);
+
+    let only_borrows = || println!("From closure: {:?}", list);
+
+    println!("Before calling closure: {:?}", list);
+    only_borrows();
+    println!("After calling closure: {:?}", list);
+}
+```
+
+* mutable reference 캡쳐
+```rust
+fn main() {
+    let mut list = vec![1, 2, 3];
+    println!("Before defining closure: {:?}", list);
+
+    let mut borrows_mutably = || list.push(7);
+
+    borrows_mutably();
+    println!("After calling closure: {:?}", list);
+}
+```
+
+* move (take ownership)
+	* 보통 쓸일은 없는데
+	* 다른 쓰레드한테 일시킬때, ownership을 넘겨주어야, 값의 소유권을 가지고 있는 애가 값을 사용하는 애보다 먼저 끝날 일을 없앨 수 있다.
+
+```rust
+use std::thread;
+
+fn main() {
+    let list = vec![1, 2, 3];
+    println!("Before defining closure: {:?}", list);
+
+    thread::spawn(move || println!("From thread: {:?}", list))
+        .join()
+        .unwrap();
+}
+```
+
+### [Moving Captured Values Out of Closures and the `Fn` Traits](https://doc.rust-lang.org/book/ch13-01-closures.html#moving-captured-values-out-of-closures-and-the-fn-traits)
+
+Closure가 정의된 곳에서 environment의 값들을 캡쳐하고, Closure가 evaluated (사용)될때, Closure의 body(내용)에서 이 값들에 뭔가 일이 생긴다.
+이 뭔가의 일은 이 중 하나다.
+* capture된 값을 closure 밖으로 내보낸다.
+* capture된 값을 변화시킨다.
+* 위의 둘 중 아무것도 안한다.
+
+Closure가 값을 캡쳐하고 다루는 방식에 따라서 closure가 어떤 trait를 구현할 지가 달라진다.
+
+Closure는 아래 3개의 `Fn` Trait 중 하나를 **자동으로** 구현하게 된다.
+
+1. `FnOnce` 한번 불릴 수 있는 클로져. capture된 값을 closure 밖으로 내보내는(move) 경우.  한번만 불려야하는 클로져는 이 Trait만 구현한다.
+2. `FnMut` captured value를 move 하지 않지만 mutate(변형)하는 경우. 한번 이상 불릴 수 있음.
+3. `Fn` move하지 않고, mutate하지 않고, 혹은 capture조차 하지 않는 closure. 무한으로 불려도 되고, **심지어 동시에 불려도 된다**.
+
+`unwrap_or_else` 메크로를 예시로 보자.
+```rust
+impl<T> Option<T> {
+    pub fn unwrap_or_else<F>(self, f: F) -> T
+    where
+        F: FnOnce() -> T
+    {
+        match self {
+            Some(x) => x,
+            None => f(),
+        }
+    }
+}
+```
+
+`unwrap_or_else`에 부여되는 closure는 `FnOnce` TraitBound를 가지고, 이것은 딱 한번만 부를 수 있다는 제약 조건이다.
+
+실제로 body에서 한 번의 `f`가 불린다.
+
+모든 closure는 `FnOnce`를 구현하기 때문에, `unwrap_or_else`는 많은 종류의 closure를 받을 수 있는 것이다.
+
+#### 다른예시
+`sort_by_key` 의 예시를 보자.
+
+```rust
+#[derive(Debug)]
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+fn main() {
+    let mut list = [
+        Rectangle { width: 10, height: 1 },
+        Rectangle { width: 3, height: 5 },
+        Rectangle { width: 7, height: 12 },
+    ];
+
+    list.sort_by_key(|r| r.width);
+    println!("{:#?}", list);
+}
+```
+
+`sort_by_key`는 `FnMut` closure를 받도록 정의되어 있다. 그 이유는 slice의 각 아이템에 대해서 한번씩 불려야하기 때문이다.
+body에서 환경의 value 를 move, mute, capture하지 않았기 때문에 Trait bound 요구사항을 만족한다.
+
+만약 아래와 같은 코드 상황에서는 어떨까?
+```rust
+// --strip
+    let mut sort_operations = vec![];
+    let value = String::from("by key called");
+
+    list.sort_by_key(|r| {
+        sort_operations.push(value);
+        r.width
+    });
+    println!("{:#?}", list);
+}
+```
+
+closure의 body를 보자.
+```rust
+        sort_operations.push(value);
+```
+
+이 부분에서 클로져 안으로 가져온 `value`의 ownership을 sort_operations로 넘긴다.
+이 클로져는 한번은 실행되겠지만, 두번째는 이미 closure가 capture한 `value`의 ownership을 넘겼기 때문에 룰에 위반된다. 따라서 이 클로져는 `FnOnce` Trait만 구현할 수 있다.
+하지만 `sort_by_key`의 클로져는 `FnMut`구현을 필요로 하기 때문에 이는 컴파일 실패한다.
+
+```console
+$ cargo run
+   Compiling rectangles v0.1.0 (file:///projects/rectangles)
+error[E0507]: cannot move out of `value`, a captured variable in an `FnMut` closure
+  --> src/main.rs:18:30
+   |
+15 |     let value = String::from("by key called");
+   |         ----- captured outer variable
+16 |
+17 |     list.sort_by_key(|r| {
+   |                      --- captured by this `FnMut` closure
+18 |         sort_operations.push(value);
+   |                              ^^^^^ move occurs because `value` has type `String`, which does not implement the `Copy` trait
+
+For more information about this error, try `rustc --explain E0507`.
+error: could not compile `rectangles` due to previous error
+```
+
+## [Processing a Series of Items with Iterators](https://doc.rust-lang.org/book/ch13-02-iterators.html#processing-a-series-of-items-with-iterators)
+
+Iterator pattern은 items의 시쿼스에 대해 같은 일을 수행할 때 좋다.
+Iterator는 다음 item을 어떻게 돌껀지에 대한 로직과 언제 끝날지에 대해 책임진다.
+
+Rust에서 iterators는 _lazy_ 하다. 그 뜻은 누군가 iterator를 consume하기 전까지 효과가 없다는 것이다.
+
+### [The `Iterator` Trait and the `next` Method](https://doc.rust-lang.org/book/ch13-02-iterators.html#the-iterator-trait-and-the-next-method)
+
+모든 iterator는 Iterator Trait를 구현한다.
+```rust
+pub trait Iterator {
+    type Item;
+
+    fn next(&mut self) -> Option<Self::Item>;
+
+    // methods with default implementations elided
+}
+```
+
+새로운 문법이 있는데, `Type Item`과 `Self::Item` 이다.
+이를 _associated type_ 이라고 하고, 나중에 배운다. 
+지금은 _Iterator를 구현할때 Item type도 선언해야한다_ 라고 생각하면 된다.
+
+iterator가 어떻게 돌아가나 사용해보자.
+```rust
+#[test]
+fn iterator_demonstration() {
+	let v1 = vec![1, 2, 3];
+
+	let mut v1_iter = v1.iter();
+
+	assert_eq!(v1_iter.next(), Some(&1));
+	assert_eq!(v1_iter.next(), Some(&2));
+	assert_eq!(v1_iter.next(), Some(&3));
+	assert_eq!(v1_iter.next(), None);
+}
+```
+
+* 여기서 `v1_iter`를 mutable로 선언한것을 눈여겨보자. 그 이유는 `next` method가 iterator의 내부 state를 업데이트해서 시퀀스를 추적하기 때문이다. `next`를 호출함으로써 아이템을 소모하기 때문에, 다른 말로 이 코드가 iterator를 _consume_ 한다고 표현한다.
+
+* `next`에서 받는게 immutable 이다. ownership을 받고 싶다면 `into_iter`, mutable reference를 받고 싶으면 `iter_mut`를 사용하자.
+
+### [Methods that Consume the Iterator](https://doc.rust-lang.org/book/ch13-02-iterators.html#methods-that-consume-the-iterator)
+
+Iterator의 next를 부르는 method를 _consuming adaptors_ 라고 한다.
+
+그 예시로 `sum`메소드가 있다.
+```rust
+    #[test]
+    fn iterator_sum() {
+        let v1 = vec![1, 2, 3];
+
+        let v1_iter = v1.iter();
+
+        let total: i32 = v1_iter.sum();
+
+        assert_eq!(total, 6);
+    }
+```
+
+### [Methods that Produce Other Iterators](https://doc.rust-lang.org/book/ch13-02-iterators.html#methods-that-produce-other-iterators)
+
+_Iterator adaptors_ 는 Iterator를 consume하는 대신에 원본에 수정을 가한 다른 iterator를 만들어 내는 메소드이다.
+
+```rust
+let v1: Vec<i32> = vec![1, 2, 3];
+v1.iter().map(|x| x + 1);
+```
+
+참고로 위 코드는 `warning: unused `Map` that must be used` Warning이 뜬다. 이유는 iterator는 consumer가 없으면 아무 효과가 없기 때문이다.
+
+
+### [Using Closures that Capture Their Environment](https://doc.rust-lang.org/book/ch13-02-iterators.html#using-closures-that-capture-their-environment)
+
+스킵
+
+
+## [Improving Our I/O Project](https://doc.rust-lang.org/book/ch13-03-improving-our-io-project.html#improving-our-io-project)
+
+이전 챕터에서 작성했던 Command Line Program을 Iterator를 사용해서 더욱 개선 시킨다.
+
+### [Removing a `clone` Using an Iterator](https://doc.rust-lang.org/book/ch13-03-improving-our-io-project.html#removing-a-clone-using-an-iterator)
+
+```rust
+impl Config {
+    pub fn build(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() < 3 {
+            return Err("not enough arguments");
+        }
+
+        let query = args[1].clone();
+        let file_path = args[2].clone();
+
+        let ignore_case = env::var("IGNORE_CASE").is_ok();
+
+        Ok(Config {
+            query,
+            file_path,
+            ignore_case,
+        })
+    }
+}
+```
+
+위의 코드처럼 `clone` 을 사용했었다. `clone`은 비효율적이기 때문에, 이제 없애 보고자한다.
+
+> Config를 리턴하기 위해서 Config가 fields의 ownership을 가져야했지만, String에 대한 ownership은 args가 가지고 있어서 clone 했었음.
+
+이제 우리는 iterator로 ownership을 가져올 수 있으므로 이를 활용해서 해결해보자.
+
+#### [Using the Returned Iterator Directly](https://doc.rust-lang.org/book/ch13-03-improving-our-io-project.html#using-the-returned-iterator-directly)
+
+`main.rs`에서 build할 때 iterator를 그대로 넘겨주도록한다.
+```rust
+fn main() {
+    let config = Config::build(env::args()).unwrap_or_else(|err| {
+        eprintln!("Problem parsing arguments: {err}");
+        process::exit(1);
+    });
+
+    // --snip--
+}
+```
+
+`build`함수 선언부도 업데이트 해야한다.
+```rust
+impl Config {
+    pub fn build(
+        mut args: impl Iterator<Item = String>,
+    ) -> Result<Config, &'static str> {
+        // --snip--
+```
+
+#### [Using `Iterator` Trait Methods Instead of Indexing](https://doc.rust-lang.org/book/ch13-03-improving-our-io-project.html#using-iterator-trait-methods-instead-of-indexing)
+
+이제 함수 body를 업데이트 해보자. `arg`의 소유권을 가져왔기 때문에 arg 에서 나온 value들의 소유권도 그대로 가지고 있고, 따라서 Config도 field들의 소유권을 가진다.
+
+```rust
+impl Config {
+    pub fn build(
+        mut args: impl Iterator<Item = String>,
+    ) -> Result<Config, &'static str> {
+        args.next();
+
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string"),
+        };
+
+        let file_path = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a file path"),
+        };
+
+        let ignore_case = env::var("IGNORE_CASE").is_ok();
+
+        Ok(Config {
+            query,
+            file_path,
+            ignore_case,
+        })
+    }
+}
+```
+
+### [Making Code Clearer with Iterator Adaptors](https://doc.rust-lang.org/book/ch13-03-improving-our-io-project.html#making-code-clearer-with-iterator-adaptors)
+
+`search` 함수도 더 깔끔하게 만들어보자. 아래가 원본이다.
+
+```rust
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    let mut results = Vec::new();
+
+    for line in contents.lines() {
+        if line.contains(query) {
+            results.push(line);
+        }
+    }
+
+    results
+}
+```
+
+필터를 사용해서 정리하자.
+```rust
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    contents
+        .lines()
+        .filter(|line| line.contains(query))
+        .collect()
+}
+```
+
+훨씬 깔끔하다.
+
+### [Choosing Between Loops or Iterators](https://doc.rust-lang.org/book/ch13-03-improving-our-io-project.html#choosing-between-loops-or-iterators)
+
+그러면 이제 루프를 쓰는 버전이 좋은지, Iterator 를 쓰는 스타일이 좋은 지에 대해 질문을 제시할 수 있다.
+대부분의 Rust 개발자는 iterator 스타일을 선호한다.
+처음에는 약간 거북할 수는 있어도, iterator adaptor를 많이 알게될 수록 더 이해하기 쉬워진다.
+
+loop를 좀 더 추상화한 iterator를 사용하면서 더 집중해야할 부분에 집중하자.
+
+근데 진짜 이 두가지 방식이 동일할까? Loop가 좀 더 빠를거 같은데 아닌가?
+
+## [Comparing Performance: Loops vs. Iterators](https://doc.rust-lang.org/book/ch13-04-performance.html#comparing-performance-loops-vs-iterators)
+
+새로 구현한 `search` 와 loop version에 대해 밴치마크를 돌려봤다. 
+```console
+test bench_search_for  ... bench:  19,620,300 ns/iter (+/- 915,700)
+test bench_search_iter ... bench:  19,234,900 ns/iter (+/- 657,200)
+```
+
+거의 동일한 성능이다.
+
+컴파일러가 iterator의 high-level abstraction을 loop와 거의 같은 코드로 만든다. Iterator는 러스트의 _zero-cost abstractions_ 중의 하나이다. 런타임에 비용을 추가 하지 않는 abstraction이라는 것이다.
+
+오디오를 decoding 하는 코드가 여기 있다. iterator를 많이 사용했다.
+```rust
+let buffer: &mut [i32];
+let coefficients: [i64; 12];
+let qlp_shift: i16;
+
+for i in 12..buffer.len() {
+    let prediction = coefficients.iter()
+		 .zip(&buffer[i - 12..i])
+		 .map(|(&c, &s)| c * s as i64)
+		 .sum::<i64>() >> qlp_shift;
+    let delta = buffer[i];
+    buffer[i] = prediction as i32 + delta;
+}
+```
+
+컴파일러가 컴파일해서 Assembly code를 만들 때 그 결과물은 우리가 직접 손으로 짤 코드(우리가 어셈블리 개 고수라면)랑 동일하다.
+
+`loop unrolling`이라는 최적화 기법을 통해서 루프조차 없애고 그냥 반복적인 코드로 바꿔버린다.
+
+# [More About Cargo and Crates.io](https://doc.rust-lang.org/book/ch14-00-more-about-cargo.html#more-about-cargo-and-cratesio)
