@@ -690,16 +690,16 @@ fn value_in_cents(coin: Coin) -> u8 {
 `Option<i32>` 에 1을 더하는 코드를 작성하면 아래처럼 작성할 수 있다.
 
 ```rust
-    fn plus_one(x: Option<i32>) -> Option<i32> {
-        match x {
-            None => None,
-            Some(i) => Some(i + 1),
-        }
-    }
+fn plus_one(x: Option<i32>) -> Option<i32> {
+	match x {
+		None => None,
+		Some(i) => Some(i + 1),
+	}
+}
 
-    let five = Some(5);
-    let six = plus_one(five);
-    let none = plus_one(None);
+let five = Some(5);
+let six = plus_one(five);
+let none = plus_one(None);
 ```
 
 
