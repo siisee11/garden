@@ -3,10 +3,14 @@ tags:
   - public
 ---
 [[충무로마피아 2차 충무회의]] 의 세미나 내용
+
 [[../Permanent/Rust 배우기|Rust 배우기]] 에 더 자세한 내용이 있음
 
+[Presentation](https://www.canva.com/design/DAF-oG8Mi-g/R2OSgegOC1rJyJZ4KCcQew/edit?utm_content=DAF-oG8Mi-g&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
 
 ## 1. Compiler 언어
+
+[컴파일언어와 인터프리터 언어](https://youtu.be/e4ax90XmUBc?si=VeftS8HNgSA_p1wY) 
 
 `소스코드 -> 컴파일 -> 머신코드(executable)` 의 개발과정을 거치는 실행하기 위해서 컴파일링이 필요한 언어이다.
 
