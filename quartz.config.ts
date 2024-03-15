@@ -48,6 +48,7 @@ const config: QuartzConfig = {
         },
       },
     },
+    locale: "en-US",
   },
   plugins: {
     transformers: [
