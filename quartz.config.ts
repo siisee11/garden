@@ -11,9 +11,7 @@ const config: QuartzConfig = {
     pageTitle: "🧠 Jaytelkasten",
     enableSPA: true,
     enablePopovers: true,
-    analytics: {
-      provider: "plausible",
-    },
+    analytics: { provider: "google", tagId: "G-4JWNMCNCDL" },
     baseUrl: "siisee11.pages.dev",
     ignorePatterns: ["private", "templates", ".obsidian"],
     defaultDateType: "created",
